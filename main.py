@@ -1,11 +1,21 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
 
+
 import absl.logging
 absl.logging.set_verbosity(absl.logging.ERROR)
 
 import cv2 # type: ignore
 import mediapipe as mp # type: ignore
+
+import mediapipe as mp
+from utils import overlay_transparent
+
+
+image_path = os.path.join("ar-face-filters","assets", "sunglasses.png")
+# Load filter image
+sunglasses = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+
 
 mp_drawing = mp.solutions.drawing_utils #accesses the drawing utilities
 mp_face_detect = mp.solutions.face_mesh #accesses the face mesh solution in MediaPipe. Use to initialize the model
@@ -35,12 +45,24 @@ with mp_face_detect.FaceMesh(min_detection_confidence= 0.5, min_tracking_confide
         image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR) # convert frames into bgr
         if output.multi_face_landmarks:
             for face_landmarks in output.multi_face_landmarks:
-                mp_drawing.draw_landmarks(image = image,
-                                          landmark_list=face_landmarks,
-                                          connections=mp_face_detect.FACEMESH_TESSELATION,
-                                          landmark_drawing_spec=d_spec,
-                                          connection_drawing_spec=d_spec
-                                          )
+                ih, iw, _ = image.shape
+
+                # Get eye positions
+                left_eye = face_landmarks.landmark[33]
+                right_eye = face_landmarks.landmark[263]
+
+                x1 = int(left_eye.x * iw)
+                y1 = int(left_eye.y * ih)
+                x2 = int(right_eye.x * iw)
+                y2 = int(right_eye.y * ih)
+
+                w = int(1.5 * abs(x2 - x1))
+                h = int(w * 0.4)
+                x = x1 - int(w * 0.25)
+                y = y1 - int(h * 0.5)
+
+                image = overlay_transparent(image, sunglasses, x, y, (w, h))
+
         cv2.imshow("AR Face Filter", image) #cv2.imshow() shows the image in a real-time window. Face detection is the title of the window
 
         k=cv2.waitKey(1)
